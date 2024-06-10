@@ -74,10 +74,20 @@ async def test_verbs(mock_auth):
             return_value=token_fixture["data"],
         ), patch(
             "aiohttp.ClientSession.request",
-            side_effect=[mock_response(""), ClientError],
+            side_effect=[mock_response("No dict"), ClientError],
         ), pytest.raises(ApiException) as error:
             await getattr(mock_auth, verb)("https://xxx.xx.yz")
-            assert error.type == ApiException
+        assert error.type == ApiException
+
+        with patch(
+            "aioautomower.auth.AbstractAuth._async_get_access_token",
+            return_value=token_fixture["data"],
+        ), patch(
+            "aiohttp.ClientSession.request",
+            side_effect=[mock_response(data="text", json=False)],
+        ), pytest.raises(ApiException) as error:
+            await getattr(mock_auth, verb)("https://xxx.xx.yz")
+        assert error.type == ApiException
 
 
 async def test_raise_for_status(mock_auth):

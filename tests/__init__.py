@@ -17,11 +17,13 @@ def load_fixture(filename: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def mock_response(data: dict[str, Any], status: int = 200):
+def mock_response(data: dict[str, Any], status: int = 200, json: bool = True):
     """Return aiohttp response json."""
     mock = AsyncMock()
     mock.return_value.status = status
-    mock.return_value.json = AsyncMock(return_value=data)
+    if json:
+        mock.return_value.json = AsyncMock(return_value=data)
+
     if status // 100 in [4, 5]:
         mock.return_value.raise_for_status = Mock(
             side_effect=ClientResponseError(
