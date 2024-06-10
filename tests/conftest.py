@@ -5,7 +5,9 @@ from collections.abc import Generator
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from aiohttp import ClientSession
 
+from aioautomower.auth import AbstractAuth
 from tests import load_fixture
 
 
@@ -38,3 +40,17 @@ def mock_automower_client_two_mowers() -> Generator[AsyncMock, None, None]:
         mowers_python = {"data": mower1_python["data"] + mower2_python["data"]}
         client.get_json.return_value = mowers_python
         yield client
+
+
+class Auth(AbstractAuth):
+    """Mock Auth."""
+
+    async def async_get_access_token(self):
+        """Return a valid access token."""
+        return "myToken"
+
+
+@pytest.fixture()
+def mock_auth() -> Auth:
+    """Return class."""
+    return Auth(websession=ClientSession(), host="myHost")
