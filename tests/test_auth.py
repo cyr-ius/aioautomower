@@ -12,6 +12,7 @@ from aioautomower.exceptions import (
     ApiException,
     ApiForbiddenException,
     ApiUnauthorizedException,
+    AuthException,
     HusqvarnaWSServerHandshakeError,
 )
 
@@ -38,7 +39,7 @@ async def test_connect(mock_auth):
 
 
 async def test_verbs(mock_auth):
-    """Test get."""
+    """Test verbs."""
 
     token_fixture = json.loads(load_fixture("jwt.json"))
     json_rsp = {"a": "b"}
@@ -48,10 +49,20 @@ async def test_verbs(mock_auth):
             "aioautomower.auth.AbstractAuth._async_get_access_token",
             return_value=token_fixture["data"],
         ), patch("aiohttp.ClientSession.request", return_value=mock_response(json_rsp)):
-            rsp = await getattr(mock_auth, verb)("https://xxx.xx.yz")
-            rslt = await rsp.json()
-            assert rslt == json_rsp
+            rsp = (
+                await getattr(mock_auth, verb)("https://xxx.xx.yz")
+                if verb == "get"
+                else await getattr(mock_auth, verb)(
+                    url="https://xxx.xx.yz", json=json_rsp
+                )
+            )
+            assert json_rsp == await rsp.json()
 
+
+async def test_error_verbs(mock_auth):
+    """Test error client."""
+    token_fixture = json.loads(load_fixture("jwt.json"))
+    for verb in ["get", "post", "patch"]:
         with patch(
             "aioautomower.auth.AbstractAuth._async_get_access_token",
             return_value=token_fixture["data"],
@@ -61,24 +72,47 @@ async def test_verbs(mock_auth):
             await getattr(mock_auth, verb)("https://xxx.xx.yz")
         assert error.type == ApiException
 
+
+async def test_json_verbs(mock_auth):
+    """Test json response."""
+
+    token_fixture = json.loads(load_fixture("jwt.json"))
+    json_rsp = {"a": "b"}
+
     for verb in ["get_json", "post_json", "patch_json"]:
         with patch(
             "aioautomower.auth.AbstractAuth._async_get_access_token",
             return_value=token_fixture["data"],
         ), patch("aiohttp.ClientSession.request", return_value=mock_response(json_rsp)):
-            rsp = await getattr(mock_auth, verb)("https://xxx.xx.yz")
+            rsp = (
+                await getattr(mock_auth, verb)("https://xxx.xx.yz")
+                if verb == "get_json"
+                else await getattr(mock_auth, verb)(
+                    url="https://xxx.xx.yz", json=json_rsp
+                )
+            )
             assert rsp == json_rsp
 
+
+async def test_error_json_verbs(mock_auth):
+    """Test error json response."""
+    token_fixture = json.loads(load_fixture("jwt.json"))
+    for verb in ["get_json", "post_json", "patch_json"]:
         with patch(
             "aioautomower.auth.AbstractAuth._async_get_access_token",
             return_value=token_fixture["data"],
         ), patch(
             "aiohttp.ClientSession.request",
-            side_effect=[mock_response("No dict"), ClientError],
+            side_effect=[mock_response("No dict")],
         ), pytest.raises(ApiException) as error:
             await getattr(mock_auth, verb)("https://xxx.xx.yz")
         assert error.type == ApiException
 
+
+async def test_error_rsp_json_verbs(mock_auth):
+    """Test get."""
+    token_fixture = json.loads(load_fixture("jwt.json"))
+    for verb in ["get_json", "post_json", "patch_json"]:
         with patch(
             "aioautomower.auth.AbstractAuth._async_get_access_token",
             return_value=token_fixture["data"],
@@ -88,6 +122,15 @@ async def test_verbs(mock_auth):
         ), pytest.raises(ApiException) as error:
             await getattr(mock_auth, verb)("https://xxx.xx.yz")
         assert error.type == ApiException
+
+
+async def test_error_get_access_token(mock_auth):
+    """Test Exception for access token."""
+    with patch(
+        "tests.conftest.Auth.async_get_access_token", side_effect=[ClientError]
+    ), pytest.raises(AuthException) as error:
+        await mock_auth.get("https://xxx.xx.yz")
+    assert error.type == AuthException
 
 
 async def test_raise_for_status(mock_auth):
